@@ -99,10 +99,20 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 	// Sessions have requests such as "pty-req", "shell", "env", and "exec".
 	// see RFC 4254, section 6
 	go func(in <-chan *ssh.Request) {
+		env := make([]envRequestData, 4)
 		for req := range in {
 			switch req.Type {
+			case "env":
+				req.Reply(true, nil)
+
+				data := new(envRequestData)
+				err := ssh.Unmarshal(req.Payload, data)
+				if err != nil {
+					c.ui.Error(err.Error())
+					continue
+				}
+				env = append(env, *data)
 			case "exec":
-				c.ui.Say(fmt.Sprintf("accepting %s request", req.Type))
 				req.Reply(true, nil)
 
 				if len(req.Payload) > 0 {
@@ -136,4 +146,9 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 
 func (c *communicatorProxy) Shutdown() {
 	c.l.Close()
+}
+
+type envRequestData struct {
+	Name  string
+	Value string
 }
