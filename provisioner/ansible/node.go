@@ -18,6 +18,16 @@ type communicatorProxy struct {
 	comm   packer.Communicator
 }
 
+func newCommunicatorProxy(done <-chan struct{}, l net.Listener, config *ssh.ServerConfig, ui packer.Ui, comm packer.Communicator) *communicatorProxy {
+	return &communicatorProxy{
+		done:   done,
+		l:      l,
+		config: config,
+		ui:     ui,
+		comm:   comm,
+	}
+}
+
 func (c *communicatorProxy) Serve() {
 	c.ui.Say(fmt.Sprintf("SSH proxy: serving on %s", c.l.Addr()))
 

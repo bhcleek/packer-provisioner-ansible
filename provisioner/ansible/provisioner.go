@@ -205,7 +205,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		return err
 	}
 
-	p.node = &communicatorProxy{done: p.done, l: localListener, config: config, ui: ui, comm: comm}
+	p.node = newCommunicatorProxy(p.done, localListener, config, ui, comm)
 
 	defer func() {
 		ui.Say("shutting down the SSH proxy")
