@@ -21,6 +21,16 @@ type communicatorProxy struct {
 func (c *communicatorProxy) Serve() {
 	c.ui.Say(fmt.Sprintf("SSH proxy: serving on %s", c.l.Addr()))
 
+	errc := make(chan error, 1)
+
+	go func(errc chan error) {
+		for err := range errc {
+			if err != nil {
+				c.ui.Error(err.Error())
+			}
+		}
+	}(errc)
+
 	for {
 		// Accept will return if either the underlying connection is closed or if a connection is made.
 		// after returning, check to see if c.done can be received. If so, then Accept() returned because
@@ -31,14 +41,18 @@ func (c *communicatorProxy) Serve() {
 			return
 		default:
 			if err != nil {
-				c.ui.Say(fmt.Sprintf("listen.Accept failed: %v", err))
+				c.ui.Error(fmt.Sprintf("listen.Accept failed: %v", err))
 			}
-			go c.Handle(conn)
+			go func(conn net.Conn) {
+				errc <- c.Handle(conn, errc)
+			}(conn)
 		}
 	}
+
+	close(errc)
 }
 
-func (c *communicatorProxy) Handle(conn net.Conn) error {
+func (c *communicatorProxy) Handle(conn net.Conn, errc chan<- error) error {
 	c.ui.Say("SSH proxy: accepted connection")
 	_, chans, reqs, err := ssh.NewServerConn(conn, c.config)
 	if err != nil {
@@ -48,16 +62,16 @@ func (c *communicatorProxy) Handle(conn net.Conn) error {
 	// discard all global requests
 	go ssh.DiscardRequests(reqs)
 
-	// Service the incoming Channel channel.
+	// Service the incoming NewChannels
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
 			newChannel.Reject(ssh.UnknownChannelType, "unknown channel type")
 			continue
 		}
-		err := c.handleSession(newChannel)
-		if err != nil {
-			return err
-		}
+
+		go func(errc chan<- error) {
+			errc <- c.handleSession(newChannel)
+		}(errc)
 	}
 
 	return nil
@@ -88,13 +102,11 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 						Stderr:  channel.Stderr(),
 						Command: string(req.Payload),
 					}
-					c.ui.Say(fmt.Sprintf("starting %s", cmd.Command))
-					if err := c.comm.Start(cmd); err != nil {
-						c.ui.Say(fmt.Sprint(err))
+					if err := cmd.StartWithUi(c.comm, c.ui); err != nil {
+						c.ui.Error(err.Error())
 						close(done)
 						return
 					}
-					cmd.Wait()
 
 					exitStatus := make([]byte, 4)
 					binary.BigEndian.PutUint32(exitStatus, uint32(cmd.ExitStatus))
