@@ -1,9 +1,11 @@
 package ansible
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/mitchellh/packer/packer"
@@ -99,21 +101,27 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 	// Sessions have requests such as "pty-req", "shell", "env", and "exec".
 	// see RFC 4254, section 6
 	go func(in <-chan *ssh.Request) {
-		env := make([]envRequestData, 4)
+		env := make([]envRequestPayload, 4)
 		for req := range in {
 			switch req.Type {
 			case "env":
 				req.Reply(true, nil)
 
-				data := new(envRequestData)
-				err := ssh.Unmarshal(req.Payload, data)
+				req, err := newEnvRequest(req)
 				if err != nil {
 					c.ui.Error(err.Error())
 					continue
 				}
-				env = append(env, *data)
+				env = append(env, req.Payload)
 			case "exec":
 				req.Reply(true, nil)
+
+				req, err := newExecRequest(req)
+				if err != nil {
+					c.ui.Error(err.Error())
+					close(done)
+					continue
+				}
 
 				if len(req.Payload) > 0 {
 					cmd := &packer.RemoteCmd{
@@ -122,6 +130,7 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 						Stderr:  channel.Stderr(),
 						Command: string(req.Payload),
 					}
+
 					if err := cmd.StartWithUi(c.comm, c.ui); err != nil {
 						c.ui.Error(err.Error())
 						close(done)
@@ -148,7 +157,60 @@ func (c *communicatorProxy) Shutdown() {
 	c.l.Close()
 }
 
-type envRequestData struct {
+type envRequest struct {
+	*ssh.Request
+	Payload envRequestPayload
+}
+
+type envRequestPayload struct {
 	Name  string
 	Value string
+}
+
+func newEnvRequest(raw *ssh.Request) (*envRequest, error) {
+	r := new(envRequest)
+	r.Request = raw
+
+	if err := ssh.Unmarshal(raw.Payload, &r.Payload); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+func sshString(buf io.Reader) (string, error) {
+	var size uint32
+	err := binary.Read(buf, binary.BigEndian, &size)
+	if err != nil {
+		return "", err
+	}
+
+	b := make([]byte, size)
+	err = binary.Read(buf, binary.BigEndian, b)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+type execRequest struct {
+	*ssh.Request
+	Payload execRequestPayload
+}
+
+type execRequestPayload string
+
+func newExecRequest(raw *ssh.Request) (*execRequest, error) {
+	r := new(execRequest)
+	r.Request = raw
+	buf := bytes.NewReader(r.Request.Payload)
+
+	var err error
+	var payload string
+	if payload, err = sshString(buf); err != nil {
+		return nil, err
+	}
+
+	r.Payload = execRequestPayload(payload)
+	return r, nil
 }
