@@ -38,7 +38,7 @@ This is a fully functional template that will provision an image on DigitalOcean
 	"builders": [
 		{
 			"type": "digitalocean",
-			"api_token": "6a561151587389c7cf8faa2d83e94150a4202da0e2bad34dd2bf236018ffaeeb"
+			"api_token": "6a561151587389c7cf8faa2d83e94150a4202da0e2bad34dd2bf236018ffaeeb",
 			"image": "ubuntu-14-04-x64",
 			"region": "sfo1"
 		},
