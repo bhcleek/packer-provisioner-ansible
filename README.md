@@ -21,7 +21,7 @@ go build -o /usr/local/bin/packer-provisioner-ansible ./plugin/provisioner-ansib
 Getting Started
 ======
 
-This is a fully functional template that will provision an image on DigitalOcean. Replace the mock api_token with your own.
+This is a fully functional template that will provision an image on DigitalOcean. Replace the mock `api_token` value with your own.
 
 ````json
 {
