@@ -104,6 +104,10 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 		env := make([]envRequestPayload, 4)
 		for req := range in {
 			switch req.Type {
+			case "pty-req":
+				// accept pty-req requests, but don't actually do anything. Necessary for OpenSSH and sudo.
+				req.Reply(true, nil)
+
 			case "env":
 				req.Reply(true, nil)
 

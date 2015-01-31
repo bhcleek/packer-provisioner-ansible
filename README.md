@@ -1,12 +1,15 @@
 packer-provisioner-ansible
 =======
 
-packer-provisioner-ansible is a [Packer](https://packer.io/) plugin that provisions machines using [Ansible](http://docs.ansible.com/).
+packer-provisioner-ansible is a [Packer](https://packer.io/) plugin that
+provisions machines using [Ansible](http://docs.ansible.com/).
 
 Limitations
 ------
 
-packer-provsioner-ansible is in early stages of development. Currently, it only supports the raw module, requires `gather_facts = no`, and only works with a paramiko connnection. *Please keep checking back; development is moving quickly*
+packer-provsioner-ansible is in early stages of development. Currently, it only
+supports the raw module and, therefore, requires `gather_facts = no`. *Please
+keep checking back; development is moving quickly*
  
 Install
 ======
@@ -21,7 +24,8 @@ go build -o /usr/local/bin/packer-provisioner-ansible ./plugin/provisioner-ansib
 Getting Started
 ======
 
-This is a fully functional template that will provision an image on DigitalOcean. Replace the mock `api_token` value with your own.
+This is a fully functional template that will provision an image on
+DigitalOcean. Replace the mock `api_token` value with your own.
 
 ````json
 {
@@ -59,4 +63,7 @@ required parameters
 optional parameters
 ------
 
-- `local_port` (string) - The port on which ansible-provisioner should first attempt to listen for SSH connections. This value is a starting point. ansible-provisioner will attempt listen for SSH connections on the first available of ten ports, starting at `local_port`. The default value is 2200.
+- `local_port` (string) - The port on which ansible-provisioner should first
+	attempt to listen for SSH connections. This value is a starting point.
+	ansible-provisioner will attempt listen for SSH connections on the first
+	available of ten ports, starting at `local_port`. The default value is 2200.
