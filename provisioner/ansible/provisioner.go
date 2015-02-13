@@ -44,7 +44,7 @@ type Config struct {
 
 type Provisioner struct {
 	config Config
-	node   *communicatorProxy
+	node   *adapter
 	done   chan struct{}
 }
 
@@ -211,7 +211,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		return err
 	}
 
-	p.node = newCommunicatorProxy(p.done, localListener, config, p.config.SFTPCmd, ui, comm)
+	p.node = newAdapter(p.done, localListener, config, p.config.SFTPCmd, ui, comm)
 
 	defer func() {
 		ui.Say("shutting down the SSH proxy")

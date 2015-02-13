@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type communicatorProxy struct {
+type adapter struct {
 	done    <-chan struct{}
 	l       net.Listener
 	config  *ssh.ServerConfig
@@ -21,8 +21,8 @@ type communicatorProxy struct {
 	comm    packer.Communicator
 }
 
-func newCommunicatorProxy(done <-chan struct{}, l net.Listener, config *ssh.ServerConfig, sftpCmd string, ui packer.Ui, comm packer.Communicator) *communicatorProxy {
-	return &communicatorProxy{
+func newAdapter(done <-chan struct{}, l net.Listener, config *ssh.ServerConfig, sftpCmd string, ui packer.Ui, comm packer.Communicator) *adapter {
+	return &adapter{
 		done:    done,
 		l:       l,
 		config:  config,
@@ -32,7 +32,7 @@ func newCommunicatorProxy(done <-chan struct{}, l net.Listener, config *ssh.Serv
 	}
 }
 
-func (c *communicatorProxy) Serve() {
+func (c *adapter) Serve() {
 	c.ui.Say(fmt.Sprintf("SSH proxy: serving on %s", c.l.Addr()))
 
 	errc := make(chan error, 1)
@@ -66,7 +66,7 @@ func (c *communicatorProxy) Serve() {
 	close(errc)
 }
 
-func (c *communicatorProxy) Handle(conn net.Conn, errc chan<- error) error {
+func (c *adapter) Handle(conn net.Conn, errc chan<- error) error {
 	c.ui.Say("SSH proxy: accepted connection")
 	_, chans, reqs, err := ssh.NewServerConn(conn, c.config)
 	if err != nil {
@@ -91,7 +91,7 @@ func (c *communicatorProxy) Handle(conn net.Conn, errc chan<- error) error {
 	return nil
 }
 
-func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
+func (c *adapter) handleSession(newChannel ssh.NewChannel) error {
 	channel, requests, err := newChannel.Accept()
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 	return nil
 }
 
-func (c *communicatorProxy) Shutdown() {
+func (c *adapter) Shutdown() {
 	c.l.Close()
 }
 
