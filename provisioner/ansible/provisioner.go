@@ -37,6 +37,7 @@ type Config struct {
 	LocalPort            string `mapstructure:"local_port"`
 	SSHHostKeyFile       string `mapstructure:"ssh_host_key_file"`
 	SSHAuthorizedKeyFile string `mapstructure:"ssh_authorized_key_file"`
+	SFTPCmd              string `mapstructure:"sftp_command"`
 	inventoryFile        string
 	raws                 []interface{}
 }
@@ -78,6 +79,7 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		"local_port":              &p.config.LocalPort,
 		"ssh_host_key_file":       &p.config.SSHHostKeyFile,
 		"ssh_authorized_key_file": &p.config.SSHAuthorizedKeyFile,
+		"sftp_cmd":                &p.config.SFTPCmd,
 	}
 
 	for n, ptr := range templates {
@@ -136,6 +138,10 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 }
 
 func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
+	for _, v := range p.config.raws {
+		ui.Message(fmt.Sprintf("%+v", v))
+	}
+
 	ui.Say("Provisioning with Ansible...")
 
 	pubKeyBytes, err := ioutil.ReadFile(p.config.SSHAuthorizedKeyFile)
@@ -205,7 +211,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		return err
 	}
 
-	p.node = newCommunicatorProxy(p.done, localListener, config, ui, comm)
+	p.node = newCommunicatorProxy(p.done, localListener, config, p.config.SFTPCmd, ui, comm)
 
 	defer func() {
 		ui.Say("shutting down the SSH proxy")
@@ -274,7 +280,7 @@ func (p *Provisioner) executeAnsible(ui packer.Ui, comm packer.Communicator) err
 	repeat := func(r io.ReadCloser) {
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
-			ui.Say(scanner.Text())
+			ui.Message(scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
 			ui.Error(err.Error())

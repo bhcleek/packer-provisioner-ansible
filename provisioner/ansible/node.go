@@ -13,20 +13,22 @@ import (
 )
 
 type communicatorProxy struct {
-	done   <-chan struct{}
-	l      net.Listener
-	config *ssh.ServerConfig
-	ui     packer.Ui
-	comm   packer.Communicator
+	done    <-chan struct{}
+	l       net.Listener
+	config  *ssh.ServerConfig
+	sftpCmd string
+	ui      packer.Ui
+	comm    packer.Communicator
 }
 
-func newCommunicatorProxy(done <-chan struct{}, l net.Listener, config *ssh.ServerConfig, ui packer.Ui, comm packer.Communicator) *communicatorProxy {
+func newCommunicatorProxy(done <-chan struct{}, l net.Listener, config *ssh.ServerConfig, sftpCmd string, ui packer.Ui, comm packer.Communicator) *communicatorProxy {
 	return &communicatorProxy{
-		done:   done,
-		l:      l,
-		config: config,
-		ui:     ui,
-		comm:   comm,
+		done:    done,
+		l:       l,
+		config:  config,
+		sftpCmd: sftpCmd,
+		ui:      ui,
+		comm:    comm,
 	}
 }
 
@@ -135,19 +137,58 @@ func (c *communicatorProxy) handleSession(newChannel ssh.NewChannel) error {
 						Command: string(req.Payload),
 					}
 
-					if err := cmd.StartWithUi(c.comm, c.ui); err != nil {
+					if err := c.comm.Start(cmd); err != nil {
 						c.ui.Error(err.Error())
 						close(done)
 						return
 					}
+					go func(cmd *packer.RemoteCmd, channel ssh.Channel) {
+						cmd.Wait()
 
-					exitStatus := make([]byte, 4)
-					binary.BigEndian.PutUint32(exitStatus, uint32(cmd.ExitStatus))
-					channel.SendRequest("exit-status", false, exitStatus)
+						exitStatus := make([]byte, 4)
+						binary.BigEndian.PutUint32(exitStatus, uint32(cmd.ExitStatus))
+						channel.SendRequest("exit-status", false, exitStatus)
+						close(done)
+					}(cmd, channel)
 				}
-				close(done)
+
+			case "subsystem":
+				req, err := newSubsystemRequest(req)
+				if err != nil {
+					c.ui.Error(err.Error())
+					continue
+				}
+
+				switch req.Payload {
+				case "sftp":
+					c.ui.Say("starting sftp subsystem")
+					req.Reply(true, nil)
+					sftpCmd := c.sftpCmd
+					if len(sftpCmd) == 0 {
+						sftpCmd = "/usr/lib/sftp-server -e"
+					}
+					cmd := &packer.RemoteCmd{
+						Stdin:   channel,
+						Stdout:  channel,
+						Stderr:  channel.Stderr(),
+						Command: sftpCmd,
+					}
+
+					if err := c.comm.Start(cmd); err != nil {
+						c.ui.Error(err.Error())
+					}
+
+					go func() {
+						cmd.Wait()
+						close(done)
+					}()
+
+				default:
+					req.Reply(false, nil)
+
+				}
 			default:
-				c.ui.Say(fmt.Sprintf("rejecting %s request", req.Type))
+				c.ui.Message(fmt.Sprintf("rejecting %s request", req.Type))
 				req.Reply(false, nil)
 			}
 		}
@@ -216,5 +257,27 @@ func newExecRequest(raw *ssh.Request) (*execRequest, error) {
 	}
 
 	r.Payload = execRequestPayload(payload)
+	return r, nil
+}
+
+type subsystemRequest struct {
+	*ssh.Request
+	Payload subsystemRequestPayload
+}
+
+type subsystemRequestPayload string
+
+func newSubsystemRequest(raw *ssh.Request) (*subsystemRequest, error) {
+	r := new(subsystemRequest)
+	r.Request = raw
+	buf := bytes.NewReader(r.Request.Payload)
+
+	var err error
+	var payload string
+	if payload, err = sshString(buf); err != nil {
+		return nil, err
+	}
+
+	r.Payload = subsystemRequestPayload(payload)
 	return r, nil
 }
