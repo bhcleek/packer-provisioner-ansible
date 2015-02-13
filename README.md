@@ -7,10 +7,8 @@ provisions machines using [Ansible](http://docs.ansible.com/).
 Limitations
 ------
 
-packer-provsioner-ansible is in early stages of development. Currently, it only
-supports the raw module and, therefore, requires `gather_facts = no`. *Please
-keep checking back; development is moving quickly*
- 
+packer-provsioner-ansible is in early stages of development.  
+
 Install
 ======
 
@@ -67,3 +65,7 @@ optional parameters
 	attempt to listen for SSH connections. This value is a starting point.
 	ansible-provisioner will attempt listen for SSH connections on the first
 	available of ten ports, starting at `local_port`. The default value is 2200.
+- `sftp_command` (string) - The command to run on the machine to handle the
+	SFTP protocol that Ansible will use to transfer files. The command should
+	read and write on stdin and stdout, respectively. Defaults to
+  `/usr/lib/sftp-server -e`
