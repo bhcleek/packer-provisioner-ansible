@@ -43,9 +43,9 @@ type Config struct {
 }
 
 type Provisioner struct {
-	config Config
-	node   *adapter
-	done   chan struct{}
+	config  Config
+	adapter *adapter
+	done    chan struct{}
 }
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
@@ -211,15 +211,15 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		return err
 	}
 
-	p.node = newAdapter(p.done, localListener, config, p.config.SFTPCmd, ui, comm)
+	p.adapter = newAdapter(p.done, localListener, config, p.config.SFTPCmd, ui, comm)
 
 	defer func() {
 		ui.Say("shutting down the SSH proxy")
 		close(p.done)
-		p.node.Shutdown()
+		p.adapter.Shutdown()
 	}()
 
-	go p.node.Serve()
+	go p.adapter.Serve()
 
 	if len(p.config.inventoryFile) == 0 {
 		tf, err := ioutil.TempFile("", "packer-provisioner-ansible")
@@ -252,8 +252,8 @@ func (p *Provisioner) Cancel() {
 	if p.done != nil {
 		close(p.done)
 	}
-	if p.node != nil {
-		p.node.Shutdown()
+	if p.adapter != nil {
+		p.adapter.Shutdown()
 	}
 	os.Exit(0)
 }
