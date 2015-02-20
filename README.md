@@ -7,7 +7,7 @@ provisions machines using [Ansible](http://docs.ansible.com/).
 Limitations
 ------
 
-packer-provsioner-ansible is in early stages of development.  
+packer-provsioner-ansible does not support SCP to transfer files.
 
 Install
 ======
@@ -68,4 +68,4 @@ optional parameters
 - `sftp_command` (string) - The command to run on the machine to handle the
 	SFTP protocol that Ansible will use to transfer files. The command should
 	read and write on stdin and stdout, respectively. Defaults to
-  `/usr/lib/sftp-server -e`
+  `/usr/lib/sftp-server -e`.
