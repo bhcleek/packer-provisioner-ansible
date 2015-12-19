@@ -19,12 +19,14 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/mitchellh/packer/common"
+	"github.com/mitchellh/packer/helper/config"
 	"github.com/mitchellh/packer/packer"
+	"github.com/mitchellh/packer/template/interpolate"
 )
 
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
-	tpl                 *packer.ConfigTemplate
+	ctx                 interpolate.Context
 
 	// The command to run ansible
 	Command string
@@ -39,7 +41,6 @@ type Config struct {
 	SSHAuthorizedKeyFile string `mapstructure:"ssh_authorized_key_file"`
 	SFTPCmd              string `mapstructure:"sftp_command"`
 	inventoryFile        string
-	raws                 []interface{}
 }
 
 type Provisioner struct {
@@ -50,62 +51,24 @@ type Provisioner struct {
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
 	p.done = make(chan struct{})
-	copy(p.config.raws, raws)
 
-	md, err := common.DecodeConfig(&p.config, raws...)
+	err := config.Decode(&p.config, &config.DecodeOpts{
+		Interpolate:        true,
+		InterpolateContext: &p.config.ctx,
+		InterpolateFilter: &interpolate.RenderFilter{
+			Exclude: []string{},
+		},
+	}, raws...)
 	if err != nil {
 		return err
 	}
-
-	p.config.tpl, err = packer.NewConfigTemplate()
-	if err != nil {
-		return err
-	}
-
-	p.config.tpl.UserVars = p.config.PackerUserVars
-
-	// Accumulate any errors
-	errs := common.CheckUnusedConfig(md)
 
 	// Defaults
 	if p.config.Command == "" {
 		p.config.Command = "ansible-playbook"
 	}
 
-	// Templates
-	templates := map[string]*string{
-		"command":                 &p.config.Command,
-		"playbook_file":           &p.config.PlaybookFile,
-		"local_port":              &p.config.LocalPort,
-		"ssh_host_key_file":       &p.config.SSHHostKeyFile,
-		"ssh_authorized_key_file": &p.config.SSHAuthorizedKeyFile,
-		"sftp_cmd":                &p.config.SFTPCmd,
-	}
-
-	for n, ptr := range templates {
-		var err error
-		*ptr, err = p.config.tpl.Process(*ptr, nil)
-		if err != nil {
-			errs = packer.MultiErrorAppend(
-				errs, fmt.Errorf("Error processing %s: %s", n, err))
-		}
-	}
-
-	sliceTemplates := map[string][]string{
-		"extra_arguments": p.config.ExtraArguments,
-	}
-
-	for n, slice := range sliceTemplates {
-		for i, elem := range slice {
-			var err error
-			slice[i], err = p.config.tpl.Process(elem, nil)
-			if err != nil {
-				errs = packer.MultiErrorAppend(
-					errs, fmt.Errorf("Error processing %s[%d]: %s", n, i, err))
-			}
-		}
-	}
-
+	var errs *packer.MultiError
 	err = validateFileConfig(p.config.PlaybookFile, "playbook_file", true)
 	if err != nil {
 		errs = packer.MultiErrorAppend(errs, err)
@@ -138,10 +101,6 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 }
 
 func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
-	for _, v := range p.config.raws {
-		ui.Message(fmt.Sprintf("%+v", v))
-	}
-
 	ui.Say("Provisioning with Ansible...")
 
 	pubKeyBytes, err := ioutil.ReadFile(p.config.SSHAuthorizedKeyFile)
