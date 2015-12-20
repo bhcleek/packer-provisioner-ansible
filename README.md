@@ -62,9 +62,10 @@ optional parameters
 ------
 
 - `local_port` (string) - The port on which ansible-provisioner should first
-	attempt to listen for SSH connections. This value is a starting point.
+  attempt to listen for SSH connections. This value is a starting point.
 	ansible-provisioner will attempt listen for SSH connections on the first
-	available of ten ports, starting at `local_port`. The default value is 2200.
+	available of ten ports, starting at `local_port`. When `local_port` is missing
+	or empty, ansible-provisioner will listen on a system-chosen port.
 - `sftp_command` (string) - The command to run on the machine to handle the
 	SFTP protocol that Ansible will use to transfer files. The command should
 	read and write on stdin and stdout, respectively. Defaults to
