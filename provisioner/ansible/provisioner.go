@@ -92,6 +92,8 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		if _, err := strconv.ParseUint(p.config.LocalPort, 10, 16); err != nil {
 			errs = packer.MultiErrorAppend(errs, fmt.Errorf("local_port: %s must be a valid port", p.config.LocalPort))
 		}
+	} else {
+		p.config.LocalPort = "0"
 	}
 
 	if errs != nil && len(errs.Errors) > 0 {
