@@ -1,7 +1,8 @@
 Deprecated
 ==========
 
-This repository does not receive active maintenance or improvements; its feature set was integrated into [Packer](https://github.com/mitchellh/packer) and released in v0.9 as one of the officially supported provisioners.
+This repository does not receive active maintenance or improvements; its feature set was integrated into [Packer](https://github.com/mitchellh/packer) and released in [v0.9.0](https://github.com/mitchellh/packer/blob/master/CHANGELOG.md#090-february-19-2016) as one of the officially supported provisioners.
+
 
 packer-provisioner-ansible
 =======
